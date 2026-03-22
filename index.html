@@ -2,25 +2,558 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Website View</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GWorld - Play & Earn</title>
+    
+    <!-- Tailwind CSS & Font Awesome -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase v8 SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
     <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            overflow: hidden;
+        /* CRITICAL RULE: Single Page Visibility */
+        .page { display: none !important; }
+        .page.active { display: block !important; }
+
+        body { 
+            user-select: none; background-color: #fff7ed; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent;
         }
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
+        .text-gradient { background: linear-gradient(to right, #dc2626, #fbbf24); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .bg-gradient-primary { background: linear-gradient(to right, #dc2626, #fbbf24); }
+        .card { background: white; border-radius: 0.75rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #ffedd5; }
+        
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #fff7ed; }
+        ::-webkit-scrollbar-thumb { background: #dc2626; border-radius: 5px; }
+        
+        #toast { 
+            position: fixed; top: 20px; right: 20px; z-index: 10000; 
+            transition: opacity 0.3s, transform 0.3s; 
+            transform: translateY(-20px); opacity: 0; pointer-events: none; 
         }
+        #toast.show { transform: translateY(0); opacity: 1; }
     </style>
 </head>
-<body>
+<body class="text-gray-800" oncontextmenu="return false;">
 
-    <iframe src="https://beige-teddi-3.tiiny.site"></iframe>
+    <!-- GLOBAL LOADER -->
+    <div id="global-loader" style="position:fixed; inset:0; z-index:9999; background:#fff7ed; display:flex; align-items:center; justify-content:center; flex-direction:column;">
+        <i class="fa-solid fa-gamepad fa-bounce text-6xl text-red-600 mb-4"></i>
+        <h1 class="text-2xl font-bold text-gradient">GWorld</h1>
+        <p id="loader-text" class="text-xs text-gray-400 mt-4 font-semibold">Connecting to server...</p>
+    </div>
 
+    <!-- TOAST -->
+    <div id="toast" class="px-4 py-2 rounded shadow-lg text-white font-semibold text-sm"></div>
+
+    <div id="app-container" class="max-w-md mx-auto bg-[#fff7ed] min-h-screen relative pb-20 shadow-2xl overflow-hidden">
+        
+        <header id="app-header" style="display:none;" class="bg-white px-4 py-3 shadow-sm sticky top-0 z-40 flex justify-between items-center border-b border-orange-100">
+            <h1 class="text-xl font-black text-gradient tracking-tight"><i class="fa-solid fa-gamepad mr-1 text-red-600"></i> GWorld</h1>
+            <div class="bg-orange-50 px-3 py-1 rounded-full border border-orange-200 flex items-center shadow-inner cursor-pointer active:scale-95 transition" onclick="navigateTo('walletPage')">
+                <i class="fa-solid fa-coins text-yellow-500 mr-2"></i>
+                <span id="header-balance" class="font-bold text-red-600">0</span>
+            </div>
+        </header>
+
+        <main class="p-4">
+            
+            <div id="loginPage" class="page">
+                <div class="mt-10 mb-8 text-center">
+                    <i class="fa-solid fa-gamepad text-6xl text-red-600 mb-4"></i>
+                    <h2 class="text-3xl font-black text-gradient">GWorld</h2>
+                    <p class="text-sm text-gray-500 mt-2">Login to play & earn</p>
+                </div>
+                <form id="loginForm" class="card p-5 space-y-4">
+                    <input type="email" id="logEmail" placeholder="Email" class="w-full p-3 rounded bg-orange-50 border border-orange-200 outline-none focus:border-red-500" required>
+                    <input type="password" id="logPass" placeholder="Password" class="w-full p-3 rounded bg-orange-50 border border-orange-200 outline-none focus:border-red-500" required>
+                    <button type="submit" class="w-full bg-gradient-primary text-white font-bold py-3 rounded shadow-md active:scale-95 transition-transform">Login</button>
+                </form>
+                <p class="text-center mt-6 text-gray-600 text-sm">Don't have an account? <span class="text-red-600 font-bold cursor-pointer" onclick="navigateTo('signupPage')">Sign Up</span></p>
+            </div>
+
+            <div id="signupPage" class="page">
+                <div class="mt-6 mb-6 text-center"><h2 class="text-2xl font-black text-gradient">Create Account</h2></div>
+                <form id="signupForm" class="card p-5 space-y-4">
+                    <input type="text" id="signUser" placeholder="Username" class="w-full p-3 rounded bg-orange-50 border border-orange-200 outline-none focus:border-red-500" required>
+                    <input type="email" id="signEmail" placeholder="Email" class="w-full p-3 rounded bg-orange-50 border border-orange-200 outline-none focus:border-red-500" required>
+                    <input type="password" id="signPass" placeholder="Password (min 6 chars)" class="w-full p-3 rounded bg-orange-50 border border-orange-200 outline-none focus:border-red-500" required minlength="6">
+                    <button type="submit" class="w-full bg-gradient-primary text-white font-bold py-3 rounded shadow-md active:scale-95 transition-transform">Sign Up</button>
+                </form>
+                <p class="text-center mt-6 text-gray-600 text-sm">Already registered? <span class="text-red-600 font-bold cursor-pointer" onclick="navigateTo('loginPage')">Login</span></p>
+            </div>
+
+            <div id="homePage" class="page">
+                <div class="mb-6">
+                    <h3 class="font-bold text-gray-700 mb-3"><i class="fa-solid fa-fire text-orange-500 mr-1"></i> Featured Games</h3>
+                    <div id="games-grid" class="grid grid-cols-2 gap-3"></div>
+                </div>
+                <div>
+                    <h3 class="font-bold text-gray-700 mb-3"><i class="fa-solid fa-trophy text-yellow-500 mr-1"></i> Upcoming Tournaments</h3>
+                    <div id="upcoming-tournaments" class="space-y-3"></div>
+                </div>
+            </div>
+
+            <div id="joinUserIdUserNamePage" class="page">
+                <div class="card p-5 text-center mt-10">
+                    <h3 class="font-bold text-xl mb-2 text-gray-800">Join Tournament</h3>
+                    <p class="text-sm text-gray-500 mb-4">Entry Fee: <span id="join-fee" class="font-bold text-red-600"></span></p>
+                    <form id="joinTournamentForm" class="space-y-4 text-left">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">In-Game Username / ID</label>
+                            <input type="text" id="joinInGameName" placeholder="Your exact game username" class="w-full p-3 rounded bg-orange-50 border border-orange-200 outline-none focus:border-red-500" required>
+                            <p class="text-[10px] text-red-500 mt-1">*Required so the admin can identify you in the room.</p>
+                        </div>
+                        <button type="submit" class="w-full bg-gradient-primary text-white font-bold py-3 rounded shadow-md active:scale-95 transition-transform">Pay Fee & Join</button>
+                        <button type="button" onclick="navigateTo('homePage')" class="w-full bg-gray-200 text-gray-700 font-bold py-3 rounded mt-2">Cancel</button>
+                    </form>
+                </div>
+            </div>
+
+            <div id="myTournamentsPage" class="page">
+                <div class="flex border-b border-orange-200 mb-4">
+                    <button onclick="switchMyMatchTab('active')" id="tab-active" class="flex-1 py-2 font-bold text-red-600 border-b-2 border-red-600">Active</button>
+                    <button onclick="switchMyMatchTab('completed')" id="tab-completed" class="flex-1 py-2 font-bold text-gray-400">Completed</button>
+                </div>
+                <div id="my-tournaments-list" class="space-y-3"></div>
+            </div>
+
+            <div id="walletPage" class="page">
+                <div class="bg-gradient-primary rounded-xl p-6 text-white shadow-md text-center mb-6">
+                    <p class="text-white/80 text-sm font-medium mb-1">Total Balance</p>
+                    <h2 class="text-4xl font-black mb-4"><i class="fa-solid fa-coins text-yellow-300 text-3xl"></i> <span id="wallet-balance-big">0</span></h2>
+                    <div class="flex gap-3 justify-center">
+                        <button onclick="navigateTo('qrCodeImagePage')" class="bg-white text-red-600 px-6 py-2 rounded-full font-bold shadow hover:bg-orange-50 active:scale-95 transition"><i class="fa-solid fa-plus mr-1"></i> Add</button>
+                        <button onclick="navigateTo('withdrawPage')" class="bg-red-800 text-white px-6 py-2 rounded-full font-bold shadow hover:bg-red-900 active:scale-95 transition"><i class="fa-solid fa-building-columns mr-1"></i> Withdraw</button>
+                    </div>
+                </div>
+                <h3 class="font-bold text-gray-700 mb-3">Transaction History</h3>
+                <div id="txn-list" class="space-y-2"></div>
+            </div>
+
+            <div id="qrCodeImagePage" class="page">
+                <div class="card p-5 mt-4 text-center">
+                    <h3 class="font-bold text-lg mb-2 text-red-600">Add Money</h3>
+                    <p class="text-[11px] text-gray-500 mb-4">Pay via Admin QR or UPI, then enter your UTR number below.</p>
+                    
+                    <div class="bg-orange-50 p-4 rounded-xl inline-block border border-orange-200 mb-4 mx-auto w-full max-w-[200px]">
+                        <img id="admin-qr-img" src="" alt="Admin QR Code" class="w-full h-auto rounded" onerror="this.src='https://via.placeholder.com/200?text=No+QR'">
+                    </div>
+                    <div class="mb-4">
+                        <p class="text-sm font-bold text-gray-700">UPI ID: <span id="admin-upi-id" class="text-red-600 select-all tracking-wide">Loading...</span></p>
+                    </div>
+
+                    <form id="addMoneyForm" class="space-y-3 text-left border-t border-orange-100 pt-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1">Amount Sent (₹)</label>
+                            <input type="number" id="addAmount" placeholder="₹" class="w-full p-3 rounded bg-orange-50 border border-orange-200 outline-none focus:border-red-500" required min="10">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1">12-Digit UTR Number</label>
+                            <input type="text" id="addUtr" placeholder="e.g. 312345678901" class="w-full p-3 rounded bg-orange-50 border border-orange-200 outline-none focus:border-red-500" required>
+                        </div>
+                        <button type="submit" class="w-full bg-gradient-primary text-white font-bold py-3 rounded shadow-md active:scale-95 transition">Submit Request</button>
+                        <button type="button" onclick="navigateTo('walletPage')" class="w-full bg-gray-200 text-gray-700 font-bold py-3 rounded mt-2">Back</button>
+                    </form>
+                </div>
+            </div>
+
+            <div id="withdrawPage" class="page">
+                <div class="card p-5 mt-4">
+                    <h3 class="font-bold text-lg mb-4 text-center text-red-600">Withdraw Funds</h3>
+                    <form id="withdrawForm" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1">Amount to Withdraw (₹)</label>
+                            <input type="number" id="wdAmount" placeholder="Min ₹50" class="w-full p-3 rounded bg-orange-50 border border-orange-200 outline-none focus:border-red-500" required min="50">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1">Your UPI ID</label>
+                            <input type="text" id="wdUpi" placeholder="yourname@upi" class="w-full p-3 rounded bg-orange-50 border border-orange-200 outline-none focus:border-red-500" required>
+                        </div>
+                        <button type="submit" class="w-full bg-gradient-primary text-white font-bold py-3 rounded shadow-md active:scale-95 transition">Request Withdrawal</button>
+                        <button type="button" onclick="navigateTo('walletPage')" class="w-full bg-gray-200 text-gray-700 font-bold py-3 rounded mt-2">Back</button>
+                    </form>
+                </div>
+            </div>
+
+            <div id="referAndShareEarnPage" class="page">
+                <div class="card p-6 mt-4 text-center">
+                    <i class="fa-solid fa-gift text-5xl text-red-600 mb-4"></i>
+                    <h2 class="text-2xl font-black text-gradient mb-2">Refer & Earn</h2>
+                    <p class="text-sm text-gray-600 mb-6">Invite your friends to GWorld and play tournaments together!</p>
+                    <div class="bg-orange-50 border-2 border-dashed border-red-300 p-4 rounded-xl mb-6">
+                        <p class="text-xs font-bold text-gray-500 mb-1">YOUR REFERRAL CODE</p>
+                        <h3 id="my-ref-code" class="text-3xl font-black text-gray-800 tracking-widest select-all">...</h3>
+                    </div>
+                    <button onclick="shareReferral()" class="w-full bg-gradient-primary text-white font-bold py-3 rounded-full shadow-md active:scale-95 transition"><i class="fa-solid fa-share-nodes mr-2"></i> Share Now</button>
+                </div>
+            </div>
+
+            <div id="profilePage" class="page">
+                <div class="card p-6 text-center">
+                    <div class="w-20 h-20 bg-gradient-primary rounded-full mx-auto flex items-center justify-center shadow-inner mb-3">
+                        <i class="fa-solid fa-user text-3xl text-white"></i>
+                    </div>
+                    <h2 id="prof-username" class="text-xl font-bold text-gray-800">User</h2>
+                    <p id="prof-email" class="text-sm text-gray-500 mb-6">email</p>
+                    <div class="space-y-3">
+                        <button onclick="resetPassword()" class="w-full bg-orange-50 text-gray-700 font-bold py-3 rounded border border-orange-200 shadow-sm active:scale-95 transition"><i class="fa-solid fa-key text-yellow-500 mr-2"></i> Reset Password</button>
+                        <button onclick="auth.signOut()" class="w-full bg-red-100 text-red-600 font-bold py-3 rounded border border-red-200 shadow-sm active:scale-95 transition"><i class="fa-solid fa-right-from-bracket mr-2"></i> Logout</button>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <nav id="user-bottom-nav" style="display:none;" class="bg-gradient-primary fixed bottom-0 left-0 right-0 max-w-md mx-auto rounded-t-2xl shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40">
+            <div class="flex justify-around items-center h-16 px-2">
+                <button class="nav-item text-white/60 flex flex-col items-center justify-center w-16 transition-all duration-300" onclick="navigateTo('homePage')">
+                    <i class="fa-solid fa-house text-xl mb-1"></i><span class="text-[10px] font-medium">Home</span>
+                </button>
+                <button class="nav-item text-white/60 flex flex-col items-center justify-center w-16 transition-all duration-300" onclick="navigateTo('myTournamentsPage')">
+                    <i class="fa-solid fa-gamepad text-xl mb-1"></i><span class="text-[10px] font-medium">Matches</span>
+                </button>
+                <button class="nav-item text-white/60 flex flex-col items-center justify-center w-16 transition-all duration-300 relative" onclick="navigateTo('walletPage')">
+                    <div class="absolute -top-5 bg-white w-12 h-12 rounded-full flex items-center justify-center shadow-md border-2 border-yellow-400">
+                        <i class="fa-solid fa-wallet text-red-600 text-xl"></i>
+                    </div>
+                    <span class="text-[10px] font-medium mt-6">Wallet</span>
+                </button>
+                <button class="nav-item text-white/60 flex flex-col items-center justify-center w-16 transition-all duration-300" onclick="navigateTo('referAndShareEarnPage')">
+                    <i class="fa-solid fa-gift text-xl mb-1"></i><span class="text-[10px] font-medium">Refer</span>
+                </button>
+                <button class="nav-item text-white/60 flex flex-col items-center justify-center w-16 transition-all duration-300" onclick="navigateTo('profilePage')">
+                    <i class="fa-solid fa-user text-xl mb-1"></i><span class="text-[10px] font-medium">Profile</span>
+                </button>
+            </div>
+        </nav>
+    </div>
+
+    <script>
+        // Safety timeout to prevent eternal loading screen if internet/Firebase fails or is blocked
+        setTimeout(function() {
+            var loader = document.getElementById('global-loader');
+            if(loader && loader.style.display !== 'none') {
+                loader.style.display = 'none';
+                showToast('Connection failed. Please use Live Server or check your internet.', true);
+                document.getElementById('loginPage').classList.add('active'); // Force show login
+            }
+        }, 8000);
+
+        try {
+            const firebaseConfig = {
+                apiKey: "AIzaSyBzeTdlSa2hjytWfYhccrwQ6HitWOrGB58",
+                authDomain: "gworld-2b482.firebaseapp.com",
+                databaseURL: "https://gworld-2b482-default-rtdb.firebaseio.com",
+                projectId: "gworld-2b482",
+                storageBucket: "gworld-2b482.firebasestorage.app",
+                messagingSenderId: "631175732137",
+                appId: "1:631175732137:web:0716a120bd7ac6af4f42b8"
+            };
+            firebase.initializeApp(firebaseConfig);
+            window.auth = firebase.auth();
+            window.db = firebase.database();
+        } catch (error) {
+            console.error("Firebase Init Error:", error);
+            showToast("Failed to connect to Database", true);
+        }
+
+        let currentUserData = null;
+        let activeMatchTab = 'active';
+        let currentJoinTournamentId = null;
+
+        function showToast(msg, isError) {
+            var t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = "px-4 py-2 rounded shadow-lg text-white font-semibold text-sm fixed top-4 right-4 z-[10000] transition-all duration-300 " + (isError ? "bg-red-600" : "bg-green-600");
+            t.classList.add('show');
+            setTimeout(function() { t.classList.remove('show'); }, 3000);
+        }
+
+        function navigateTo(pageId, data) {
+            if(pageId === 'joinUserIdUserNamePage' && data) {
+                currentJoinTournamentId = data;
+            }
+
+            // Remove modern syntax `?.` to prevent crashes in older browsers
+            var pages = document.querySelectorAll('.page');
+            for(var i=0; i<pages.length; i++) {
+                pages[i].classList.remove('active');
+            }
+            
+            var targetPage = document.getElementById(pageId);
+            if(targetPage) targetPage.classList.add('active');
+            
+            loadPageContent(pageId);
+            
+            var navTarget = pageId;
+            if(pageId === 'qrCodeImagePage' || pageId === 'withdrawPage') navTarget = 'walletPage';
+            if(pageId === 'joinUserIdUserNamePage') navTarget = 'homePage';
+
+            var navItems = document.querySelectorAll('.nav-item');
+            for(var j=0; j<navItems.length; j++) {
+                var item = navItems[j];
+                item.className = 'nav-item text-center transition-all duration-300 flex flex-col items-center justify-center w-16 text-white/60 scale-100';
+                if(item.innerHTML.indexOf(navTarget) !== -1 && pageId !== 'walletPage') {
+                    item.classList.remove('text-white/60'); item.classList.add('text-white', 'scale-110', '-translate-y-1', 'font-bold', 'drop-shadow-md');
+                } else if (navTarget === 'walletPage' && item.innerHTML.indexOf('wallet') !== -1) {
+                    item.classList.remove('text-white/60'); item.classList.add('text-white', 'scale-110', '-translate-y-1', 'font-bold', 'drop-shadow-md');
+                }
+            }
+            window.scrollTo(0, 0);
+        }
+
+        if(window.auth) {
+            auth.onAuthStateChanged(function(user) {
+                document.getElementById('global-loader').style.display = 'none';
+                
+                var header = document.getElementById('app-header');
+                var nav = document.getElementById('user-bottom-nav');
+
+                if (user) {
+                    header.style.display = 'flex';
+                    nav.style.display = 'block';
+
+                    db.ref('users/' + user.uid).on('value', function(snap) {
+                        if(snap.exists()){
+                            currentUserData = snap.val();
+                            currentUserData.uid = user.uid;
+                            document.getElementById('header-balance').innerText = currentUserData.wallet_balance || 0;
+                        }
+                    });
+
+                    navigateTo('homePage');
+                } else {
+                    currentUserData = null;
+                    header.style.display = 'none';
+                    nav.style.display = 'none';
+                    navigateTo('loginPage');
+                }
+            });
+        }
+
+        function loadPageContent(pageId) {
+            if(!currentUserData && pageId !== 'loginPage' && pageId !== 'signupPage') return;
+
+            if (pageId === 'homePage') {
+                db.ref('games').once('value', function(snap) {
+                    var grid = document.getElementById('games-grid');
+                    grid.innerHTML = '';
+                    snap.forEach(function(c) {
+                        var g = c.val();
+                        grid.innerHTML += '<div class="card overflow-hidden cursor-pointer active:scale-95 transition" onclick="window.location.href=\'' + g.game_url + '\'">' +
+                                '<img src="' + g.image_url + '" class="w-full h-24 object-cover">' +
+                                '<div class="p-2 text-center text-xs font-bold text-gray-800">' + g.title + '</div></div>';
+                    });
+                });
+                db.ref('tournaments').orderByChild('status').equalTo('Upcoming').once('value', function(snap) {
+                    var list = document.getElementById('upcoming-tournaments');
+                    list.innerHTML = '';
+                    if(!snap.exists()) { list.innerHTML = '<p class="text-sm text-gray-400">No upcoming tournaments available.</p>'; return; }
+                    snap.forEach(function(c) {
+                        var t = c.val();
+                        list.innerHTML += '<div class="card p-3 flex justify-between items-center border-l-4 border-l-red-600">' +
+                                '<div><h4 class="font-bold text-sm">' + t.title + '</h4>' +
+                                '<p class="text-xs text-gray-500">' + t.game_name + ' • Fee: ₹' + t.entry_fee + ' • Prize: ₹' + t.prize_pool + '</p>' +
+                                '<p class="text-[10px] text-red-500 font-bold mt-1"><i class="fa-regular fa-clock"></i> ' + new Date(t.match_time).toLocaleString() + '</p></div>' +
+                                '<button onclick="navigateTo(\'joinUserIdUserNamePage\', \'' + c.key + '\')" class="bg-gradient-primary text-white px-4 py-2 rounded font-bold text-sm shadow active:scale-95 transition">Join</button></div>';
+                    });
+                });
+            }
+            else if (pageId === 'joinUserIdUserNamePage') {
+                if(!currentJoinTournamentId) return navigateTo('homePage');
+                db.ref('tournaments/' + currentJoinTournamentId).once('value', function(snap) {
+                    document.getElementById('join-fee').innerText = '₹' + snap.val().entry_fee;
+                });
+            }
+            else if (pageId === 'myTournamentsPage') {
+                renderMyMatches();
+            }
+            else if (pageId === 'walletPage') {
+                document.getElementById('wallet-balance-big').innerText = currentUserData.wallet_balance || 0;
+                db.ref('transactions/' + currentUserData.uid).orderByChild('created_at').once('value', function(snap) {
+                    var list = document.getElementById('txn-list');
+                    list.innerHTML = '';
+                    var txns = [];
+                    snap.forEach(function(c) { txns.push(c.val()); });
+                    
+                    if(txns.length === 0) { list.innerHTML = '<p class="text-xs text-center text-gray-400 mt-4">No transactions yet.</p>'; return; }
+
+                    txns.reverse().forEach(function(txn) {
+                        var color = (txn.type === 'deposit' || txn.type === 'prize') ? 'text-green-600' : 'text-red-600';
+                        var sign = (txn.type === 'deposit' || txn.type === 'prize') ? '+' : '-';
+                        var statCol = txn.status === 'pending' ? 'text-yellow-500' : (txn.status === 'rejected' ? 'text-red-500' : 'text-green-500');
+                        var statText = txn.status ? '<span class="text-[10px] font-bold ' + statCol + ' uppercase">' + txn.status + '</span>' : '';
+                        
+                        list.innerHTML += '<div class="card p-3 flex justify-between items-center">' +
+                                '<div><p class="text-xs font-bold capitalize text-gray-800">' + txn.description + '</p>' +
+                                '<p class="text-[10px] text-gray-400">' + new Date(txn.created_at).toLocaleString() + '</p>' + statText + '</div>' +
+                                '<div class="font-black ' + color + '">' + sign + '₹' + txn.amount + '</div></div>';
+                    });
+                });
+            }
+            else if (pageId === 'qrCodeImagePage') {
+                db.ref('settings/payment').once('value', function(snap) {
+                    if(snap.exists()) {
+                        document.getElementById('admin-qr-img').src = snap.val().qr_url || '';
+                        document.getElementById('admin-upi-id').innerText = snap.val().upi_id || 'Not Set by Admin';
+                    }
+                });
+            }
+            else if (pageId === 'referAndShareEarnPage') {
+                document.getElementById('my-ref-code').innerText = currentUserData.uid.substring(0, 6).toUpperCase();
+            }
+            else if (pageId === 'profilePage') {
+                document.getElementById('prof-username').innerText = currentUserData.username;
+                document.getElementById('prof-email').innerText = currentUserData.email;
+            }
+        }
+
+        function switchMyMatchTab(tab) {
+            activeMatchTab = tab;
+            document.getElementById('tab-active').className = 'flex-1 py-2 font-bold ' + (tab==='active'?'text-red-600 border-b-2 border-red-600':'text-gray-400');
+            document.getElementById('tab-completed').className = 'flex-1 py-2 font-bold ' + (tab==='completed'?'text-red-600 border-b-2 border-red-600':'text-gray-400');
+            renderMyMatches();
+        }
+
+        function renderMyMatches() {
+            var list = document.getElementById('my-tournaments-list');
+            list.innerHTML = '<div class="text-center text-sm text-gray-400 mt-10"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><br>Loading...</div>';
+            
+            db.ref('tournaments').once('value', function(snap) {
+                var html = '';
+                var promises = [];
+                snap.forEach(function(c) {
+                    var t = c.val(); 
+                    var tId = c.key;
+                    var isCompleted = t.status === 'Completed';
+                    
+                    if((activeMatchTab === 'active' && !isCompleted) || (activeMatchTab === 'completed' && isCompleted)) {
+                        var p = db.ref('participants/' + tId + '/' + currentUserData.uid).once('value').then(function(pSnap) {
+                            if(pSnap.exists()) {
+                                var pData = pSnap.val();
+                                var extraInfo = '';
+                                if(activeMatchTab === 'active') {
+                                    if(t.room_id) {
+                                        extraInfo = '<div class="mt-2 bg-orange-50 p-2 border border-orange-200 rounded text-xs">' +
+                                                '<p><b>Room ID:</b> <span class="select-all text-red-600 font-bold">' + t.room_id + '</span></p>' +
+                                                '<p><b>Password:</b> <span class="select-all text-red-600 font-bold">' + t.room_password + '</span></p></div>';
+                                    } else {
+                                        extraInfo = '<p class="text-[11px] text-yellow-600 font-bold mt-2"><i class="fa-regular fa-clock"></i> Room Details will appear here soon.</p>';
+                                    }
+                                } else {
+                                    var resColor = pData.status==='Winner'?'text-green-600':'text-gray-500';
+                                    extraInfo = '<p class="text-xs font-bold mt-2 ' + resColor + '">Result: ' + pData.status + '</p>';
+                                }
+
+                                html += '<div class="card p-3"><div class="flex justify-between border-b border-gray-100 pb-2 mb-2">' +
+                                        '<div><h4 class="font-bold text-sm">' + t.title + '</h4><p class="text-[11px] text-gray-500 font-medium">IGN: ' + pData.in_game_name + '</p></div>' +
+                                        '<span class="text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded font-bold self-start">' + t.status + '</span></div>' + extraInfo + '</div>';
+                            }
+                        });
+                        promises.push(p);
+                    }
+                });
+
+                Promise.all(promises).then(function() {
+                    list.innerHTML = html || '<p class="text-center text-sm text-gray-400 mt-10">No matches found in this section.</p>';
+                });
+            });
+        }
+
+        // --- FORMS ---
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            auth.signInWithEmailAndPassword(document.getElementById('logEmail').value, document.getElementById('logPass').value).catch(function(err){ showToast(err.message, true); });
+        });
+
+        document.getElementById('signupForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var u = document.getElementById('signUser').value, em = document.getElementById('signEmail').value, p = document.getElementById('signPass').value;
+            auth.createUserWithEmailAndPassword(em, p).then(function(cred) {
+                db.ref('users/' + cred.user.uid).set({ username: u, email: em, wallet_balance: 0, created_at: Date.now() });
+            }).catch(function(err) { showToast(err.message, true); });
+        });
+
+        document.getElementById('joinTournamentForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            if(!currentJoinTournamentId) return;
+            var ign = document.getElementById('joinInGameName').value;
+            
+            try {
+                var tSnap = await db.ref('tournaments/' + currentJoinTournamentId).once('value');
+                var t = tSnap.val();
+                var bal = currentUserData.wallet_balance || 0;
+
+                if (bal < t.entry_fee) { return showToast('Insufficient Balance! Please Add Money.', true); }
+
+                var updates = {};
+                updates['users/' + currentUserData.uid + '/wallet_balance'] = bal - t.entry_fee;
+                updates['participants/' + currentJoinTournamentId + '/' + currentUserData.uid] = { in_game_name: ign, status: 'Participated', created_at: Date.now() };
+                
+                var txnId = db.ref().child('transactions').push().key;
+                updates['transactions/' + currentUserData.uid + '/' + txnId] = { amount: t.entry_fee, type: 'debit', description: 'Entry Fee: ' + t.title, created_at: Date.now() };
+
+                await db.ref().update(updates);
+                showToast('Successfully Joined Tournament!');
+                document.getElementById('joinTournamentForm').reset();
+                navigateTo('myTournamentsPage');
+
+            } catch (err) { showToast(err.message, true); }
+        });
+
+        document.getElementById('addMoneyForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var amt = Number(document.getElementById('addAmount').value);
+            var utr = document.getElementById('addUtr').value;
+            var txnId = db.ref().child('transactions').push().key;
+            db.ref('transactions/' + currentUserData.uid + '/' + txnId).set({
+                amount: amt, utr: utr, type: 'deposit', description: 'Deposit via QR/UPI', status: 'pending', created_at: Date.now()
+            }).then(function() {
+                showToast('Request submitted! Waiting for Admin approval.');
+                document.getElementById('addMoneyForm').reset();
+                navigateTo('walletPage');
+            }).catch(function(err) { showToast(err.message, true); });
+        });
+
+        document.getElementById('withdrawForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var amt = Number(document.getElementById('wdAmount').value);
+            var upi = document.getElementById('wdUpi').value;
+
+            if(currentUserData.wallet_balance < amt) return showToast('Insufficient Balance', true);
+
+            var txnId = db.ref().child('transactions').push().key;
+            db.ref('transactions/' + currentUserData.uid + '/' + txnId).set({
+                amount: amt, upi: upi, type: 'withdrawal', description: 'Withdrawal to UPI', status: 'pending', created_at: Date.now()
+            }).then(function() {
+                db.ref('users/' + currentUserData.uid + '/wallet_balance').set(currentUserData.wallet_balance - amt);
+                showToast('Withdrawal Requested Successfully.');
+                document.getElementById('withdrawForm').reset();
+                navigateTo('walletPage');
+            });
+        });
+
+        function shareReferral() {
+            var code = document.getElementById('my-ref-code').innerText;
+            var text = "Join GWorld and play epic tournaments to earn real money! Use my referral code: " + code;
+            if (navigator.share) {
+                navigator.share({ title: 'GWorld App', text: text });
+            } else {
+                navigator.clipboard.writeText(text);
+                showToast('Referral code copied to clipboard!');
+            }
+        }
+
+        function resetPassword() {
+            auth.sendPasswordResetEmail(currentUserData.email).then(function() {
+                showToast('Password reset link sent to your email!');
+            }).catch(function(err) { showToast(err.message, true); });
+        }
+    </script>
 </body>
 </html>

@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Pro Pool 3D Ultimate</title>
+<style>
+    :root {
+        --wood-dark: #2d1b0e;
+        --wood-light: #5d4037;
+        --felt: #006400;
+        --gold: #ffd700;
+    }
+
+    body {
+        margin: 0; padding: 0;
+        background: linear-gradient(to bottom, #002244, #000022);
+        font-family: 'Segoe UI', sans-serif;
+        overflow: hidden; touch-action: none; user-select: none;
+        display: flex; flex-direction: column;
+        height: 100vh; width: 100vw;
+        color: white;
+    }
+
+    #ui-layer {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        pointer-events: none; z-index: 10;
+        display: flex; flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .hud-top {
+        pointer-events: auto;
+        height: 80px;
+        background: linear-gradient(180deg, rgba(20,20,20,0.95) 0%, rgba(20,20,20,0) 100%);
+        padding: 10px 15px 30px 15px;
+        display: flex; flex-direction: row;
+        justify-content: space-between;
+        box-sizing: border-box;
+    }
+
+    .player-card {
+        border-radius: 30px;
+        background: rgba(0,0,0,0.5);
+        border: 1px solid #333;
+        padding: 3px 8px 3px 3px;
+        display: flex; flex-direction: row; align-items: center; gap: 5px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        transition: all 0.3s ease;
+    }
+
+    .avatar {
+        width: 24px; height: 24px;
+        border-radius: 50%;
+        border: 1px solid #ffd700;
+        box-shadow: 0 0 10px rgba(255,215,0,0.2);
+        background: #fff;
+    }
+
+    .ball-icon {
+        display: inline-block;
+        width: 12px; height: 12px;
+        border-radius: 50%;
+        border: 1px solid rgba(255,255,255,0.3);
+    }
+
+    .controls-area {
+        position: absolute; bottom: 0; right: 0;
+        width: 40px; height: 100%;
+        display: flex; flex-direction: column;
+        justify-content: flex-end; align-items: center;
+        padding-bottom: 40px; pointer-events: none;
+        box-sizing: border-box;
+    }
+
+    .power-wrapper {
+        pointer-events: auto;
+        width: 18px; height: 250px;
+        background: rgba(0,0,0,0.6);
+        border: 2px solid #444; border-radius: 10px;
+        position: relative; margin-right: 10px;
+    }
+
+    .power-track {
+        position: absolute; left: 50%; transform: translateX(-50%);
+        width: 2px; top: 10px; bottom: 10px;
+        background: #333;
+    }
+
+    .cue-knob {
+        position: absolute; width: 16px; height: 40px;
+        left: 50%; transform: translateX(-50%); top: 0;
+        background: linear-gradient(to right, #e0c090, #5d4037);
+        border-radius: 6px; box-shadow: 0 5px 15px rgba(0,0,0,0.8);
+        cursor: grab;
+    }
+
+    .cue-knob::before {
+        content: ''; position: absolute;
+        top: -4px; left: 3px; right: 3px; height: 4px;
+        background: #007bff; border-radius: 2px 2px 0 0;
+    }
+
+    #game-wrapper {
+        flex: 1; position: relative;
+        display: flex; align-items: center; justify-content: center;
+        overflow: hidden; padding-top: 80px; padding-bottom: 20px;
+        box-sizing: border-box;
+    }
+
+    canvas {
+        box-shadow: 0 30px 60px rgba(0,0,0,0.9);
+        border-radius: 40px;
+    }
+
+    .notification {
+        position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity: 0; background: rgba(0,0,0,0.8);
+        color: var(--gold); border: 2px solid var(--gold);
+        padding: 15px 30px; border-radius: 10px;
+        font-size: 32px; font-weight: 800; text-transform: uppercase;
+        z-index: 50; pointer-events: none;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    #menu-overlay {
+        position: absolute; top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(0,0,0,0.92);
+        z-index: 100; display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        backdrop-filter: blur(8px);
+    }
+
+    .menu-box {
+        background: linear-gradient(145deg, #1e1e1e, #141414);
+        padding: 40px; border-radius: 20px;
+        border: 1px solid #333; max-width: 320px; text-align: center;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+    }
+
+    .btn-gold {
+        background: linear-gradient(to bottom, #ffd700, #ffb300);
+        border: none; padding: 16px 50px; color: #2d1b0e;
+        font-weight: 900; font-size: 20px; border-radius: 50px;
+        margin-top: 25px; text-transform: uppercase; letter-spacing: 1px;
+        box-shadow: 0 5px 15px rgba(255,215,0,0.3);
+        transition: transform 0.1s; cursor: pointer;
+    }
+
+    .btn-gold:active { transform: scale(0.95); }
+</style>
+</head>
+<body>
+
+<div id="ui-layer">
+    <div class="hud-top">
+        <div id="p1-card" class="player-card">
+            <img class="avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Max">
+            <span style="font-weight:bold; font-size:14px; margin-top:2px;">PLAYER</span>
+            <span id="p1-score" class="ball-icon" style="background:#d32f2f"></span>
+        </div>
+        <div id="p2-card" class="player-card" style="flex-direction:row-reverse">
+            <img class="avatar" src="https://api.dicebear.com/7.x/bottts/svg?seed=Robo">
+            <span style="font-weight:bold; font-size:14px; margin-top:2px;">CPU</span>
+            <span id="p2-score" class="ball-icon" style="background:#ffc107"></span>
+        </div>
+    </div>
+    
+    <div id="game-toast" class="notification"></div>
+    
+    <div class="controls-area">
+        <div style="font-size: 10px; font-weight: bold; color: white; text-shadow: 0 2px 4px black; margin-bottom: 8px; margin-right: 10px;">POWER</div>
+        <div id="power-slider" class="power-wrapper">
+            <div class="power-track"></div>
+            <div id="cue-knob" class="cue-knob"></div>
+        </div>
+    </div>
+</div>
+
+<div id="game-wrapper">
+    <canvas id="poolCanvas"></canvas>
+</div>
+
+<div id="menu-overlay">
+    <div class="menu-box">
+        <h1 style="margin:0; font-size:36px; color:var(--gold);">PRO POOL <span style="font-size:18px; color:white; display:block;">ULTIMATE 3D</span></h1>
+        <p style="color:#aaa; margin:10px 0 20px 0;">First to pocket their suite wins!</p>
+        <div style="color:#eee; line-height:1.6; font-size:14px; margin-bottom:10px;">
+            🎱 Drag table to aim<br>
+            ⬇️ Pull power slider to shoot<br>
+            🏆 Watch out for the 8-ball!
+        </div>
+        <button class="btn-gold" onclick="startGame()">PLAY</button>
+    </div>
+</div>
+
+<script>
+    // 🔧 GLOBAL SETUP
+    const IS_MOBILE = window.innerHeight > window.innerWidth;
+    const TABLE_W = IS_MOBILE ? 500 : 920;
+    const TABLE_H = IS_MOBILE ? 920 : 460;
+    const BALL_R = 16.5;
+    const POCKET_R = 34;
+    const RAIL_WIDTH = 35;
+    const FRICTION = 0.988;
+    const RAIL_DAMP = 0.6;
+    const SUB_STEPS = 8;
+    let SCALE = 1;
+
+    let balls = [];
+    let gameState = 'AIMING';
+    let turn = 'PLAYER';
+    let cue = { angle: IS_MOBILE ? Math.PI/2 : Math.PI, power: 0 };
+    
+    const canvas = document.getElementById('poolCanvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    const toast = document.getElementById('game-toast');
+
+    // Create felt noise pattern
+    const feltCanvas = document.createElement('canvas');
+    feltCanvas.width = 100; feltCanvas.height = 100;
+    const fCtx = feltCanvas.getContext('2d');
+    fCtx.fillStyle = '#0f5f30';
+    fCtx.fillRect(0, 0, 100, 100);
+    for(let i=0; i<800; i++){
+        fCtx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.1})`;
+        fCtx.fillRect(Math.random() * 100, Math.random() * 100, 1, 1);
+    }
+    let feltPattern;
+
+    // 📐 RESIZE FUNCTION
+    function resize() {
+        const wrapper = document.getElementById('game-wrapper');
+        const availW = wrapper.clientWidth;
+        const paddingTop = parseFloat(getComputedStyle(wrapper).paddingTop);
+        const paddingBottom = parseFloat(getComputedStyle(wrapper).paddingBottom);
+        const availH = wrapper.clientHeight - (paddingTop + paddingBottom);
+        
+        const aspect = TABLE_W / TABLE_H;
+        let finalW = availW;
+        let finalH = availW / aspect;
+        
+        if (finalH > availH) {
+            finalH = availH;
+            finalW = availH * aspect;
+        }
+        
+        canvas.width = finalW;
+        canvas.height = finalH;
+        SCALE = finalW / TABLE_W;
+        
+        if (!feltPattern) {
+            feltPattern = ctx.createPattern(feltCanvas, 'repeat');
+        }
+    }
+    window.addEventListener('resize', resize);
+
+    // 🎱 BALL INITIALIZATION
+    function initGame() {
+        resize();
+        balls = [];
+        const cx = TABLE_W / 2;
+        const cy = TABLE_H / 2;
+        
+        // Cue ball position
+        const cueX = IS_MOBILE ? cx : TABLE_W * 0.25;
+        const cueY = IS_MOBILE ? TABLE_H * 0.75 : cy;
+        
+        // Rack apex position
+        const rackX = IS_MOBILE ? cx : TABLE_W * 0.75;
+        const rackY = IS_MOBILE ? TABLE_H * 0.25 : cy;
+        
+        // Cue ball is balls[0], id=0
+        balls.push({ x: cueX, y: cueY, vx: 0, vy: 0, id: 0, active: true });
+        
+        const sp = BALL_R * 2 + 1; // spacing between ball centers
+        const rows = 5;
+        
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c <= r; c++) {
+                let bx, by;
+                if (IS_MOBILE) {
+                    // Rack grows UPWARD from rackY
+                    by = rackY - (r * sp * 0.866);
+                    bx = cx - (r * sp / 2) + (c * sp);
+                } else {
+                    // Rack grows RIGHTWARD from rackX
+                    bx = rackX + (r * sp * 0.866);
+                    by = cy - (r * sp / 2) + (c * sp);
+                }
+                
+                let id = balls.length; // default id = insertion order
+                if (r === 2 && c === 1) id = 8;      // 8-ball at center
+                else if (id === 8) id = 15;           // skip 8 if collision
+
+                balls.push({ x: bx, y: by, vx: 0, vy: 0, id: id, active: true });
+            }
+        }
+        
+        gameState = 'AIMING';
+        turn = 'PLAYER';
+        cue.angle = IS_MOBILE ? -Math.PI/2 : 0; // facing the rack
+        updateUI();
+    }
+
+    // 🕳️ POCKET LOCATIONS
+    function getPocketLocs() {
+        const m = RAIL_WIDTH;
+        const w = TABLE_W, h = TABLE_H;
+        const locs = [
+            { x: m, y: m },         // top-left
+            { x: w - m, y: m },     // top-right
+            { x: m, y: h - m },     // bottom-left
+            { x: w - m, y: h - m }  // bottom-right
+        ];
+        if (IS_MOBILE) {
+            locs.push({ x: m, y: h / 2 });       // left-mid
+            locs.push({ x: w - m, y: h / 2 });   // right-mid
+        } else {
+            locs.push({ x: w / 2, y: m });       // top-mid
+            locs.push({ x: w / 2, y: h - m });   // bottom-mid
+        }
+        return locs;
+    }
+
+    // ⚙️ PHYSICS LOOP
+    function updatePhysics() {
+        if (gameState !== 'MOVING') return;
+        let moving = false;
+        const margin = RAIL_WIDTH;
+        
+        for (let s = 0; s < SUB_STEPS; s++) {
+            // 1. Move all balls
+            balls.forEach(b => {
+                if (!b.active) return;
+                b.x += b.vx / SUB_STEPS;
+                b.y += b.vy / SUB_STEPS;
+                
+                // Rail bouncing
+                if (b.x < margin + BALL_R)              { b.x = margin + BALL_R;             b.vx *= -RAIL_DAMP; }
+                if (b.x > TABLE_W - margin - BALL_R)    { b.x = TABLE_W - margin - BALL_R;   b.vx *= -RAIL_DAMP; }
+                if (b.y < margin + BALL_R)              { b.y = margin + BALL_R;             b.vy *= -RAIL_DAMP; }
+                if (b.y > TABLE_H - margin - BALL_R)    { b.y = TABLE_H - margin - BALL_R;   b.vy *= -RAIL_DAMP; }
+            });
+
+            // 2. Ball-to-ball collisions
+            for (let i = 0; i < balls.length; i++) {
+                for (let j = i + 1; j < balls.length; j++) {
+                    const b1 = balls[i], b2 = balls[j];
+                    if (!b1.active || !b2.active) continue;
+
+                    const dx = b2.x - b1.x, dy = b2.y - b1.y;
+                    const d2 = dx * dx + dy * dy;
+                    const minD = BALL_R * 2;
+
+                    if (d2 < minD * minD) {
+                        const dist = Math.sqrt(d2);
+                        const nx = dx / dist, ny = dy / dist;
+                        const pen = (minD - dist) * 0.5;
+
+                        // Push apart
+                        b1.x -= nx * pen; b1.y -= ny * pen;
+                        b2.x += nx * pen; b2.y += ny * pen;
+
+                        // Velocity exchange (1D elastic along normal)
+                        const v1n = b1.vx * nx + b1.vy * ny;
+                        const v2n = b2.vx * nx + b2.vy * ny;
+                        const dv = v1n - v2n;
+
+                        if (dv > 0) {
+                            b1.vx -= dv * nx; b1.vy -= dv * ny;
+                            b2.vx += dv * nx; b2.vy += dv * ny;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 3. Apply friction, check if still moving
+        balls.forEach(b => {
+            if (!b.active) return;
+            b.vx *= FRICTION;
+            b.vy *= FRICTION;
+            if (Math.abs(b.vx) + Math.abs(b.vy) > 0.05) moving = true;
+            else { b.vx = 0; b.vy = 0; }
+        });
+        
+        checkPockets();
+        if (!moving) handleTurnEnd();
+    }
+
+    // 🕳️ POCKET CHECK
+    function checkPockets() {
+        const pockets = getPocketLocs();
+        balls.forEach(b => {
+            if (!b.active) return;
+            for (let p of pockets) {
+                if (Math.hypot(b.x - p.x, b.y - p.y) < POCKET_R) {
+                    b.active = false;
+                    if (b.id === 0) showNotification("SCRATCH!", "#ff4444");
+                    else showNotification(`BALL ${b.id}`, "#ffd700");
+                }
+            }
+        });
+    }
+
+    // 🔄 TURN END HANDLER
+    function handleTurnEnd() {
+        // Respawn cue ball if scratched
+        if (!balls[0].active) {
+            balls[0].active = true;
+            balls[0].vx = 0; balls[0].vy = 0;
+            balls[0].x = IS_MOBILE ? TABLE_W / 2 : TABLE_W * 0.25;
+            balls[0].y = IS_MOBILE ? TABLE_H * 0.75 : TABLE_H / 2;
+        }
+        turn = (turn === 'PLAYER') ? 'CPU' : 'PLAYER';
+        gameState = 'AIMING';
+        updateUI();
+        if (turn === 'CPU') setTimeout(cpuPlay, 1000);
+    }
+
+    function updateUI() {
+        const p1Card = document.getElementById('p1-card');
+        const p2Card = document.getElementById('p2-card');
+        
+        if (turn === 'PLAYER') {
+            p1Card.style.borderColor = '#ffd700'; p1Card.style.opacity = '1';
+            p2Card.style.borderColor = '#333'; p2Card.style.opacity = '0.5';
+        } else {
+            p2Card.style.borderColor = '#ffd700'; p2Card.style.opacity = '1';
+            p1Card.style.borderColor = '#333'; p1Card.style.opacity = '0.5';
+        }
+    }
+
+    // 🤖 CPU AI
+    function cpuPlay() {
+        if (turn !== 'CPU' || gameState !== 'AIMING') return;
+        const targets = balls.filter(b => b.active && b.id !== 0);
+        const bestTarget = targets.length > 0 
+            ? targets[Math.floor(Math.random() * targets.length)] 
+            : null;
+            
+        if (bestTarget) {
+            const cb = balls[0];
+            cue.angle = Math.atan2(bestTarget.y - cb.y, bestTarget.x - cb.x);
+            cue.angle += (Math.random() - 0.5) * 0.02;
+            cue.power = 0.4 + Math.random() * 0.5;
+        } else {
+            cue.angle = Math.random() * Math.PI * 2;
+            cue.power = 0.5;
+        }
+        setTimeout(shoot, 500);
+    }
+
+    // 🎯 SHOOT FUNCTION
+    function shoot() {
+        const force = cue.power * 45;
+        balls[0].vx = Math.cos(cue.angle) * force;
+        balls[0].vy = Math.sin(cue.angle) * force;
+        gameState = 'MOVING';
+    }
+
+    // 🖱️ INPUT HANDLING
+    function handleAim(e) {
+        if (gameState !== 'AIMING' || turn !== 'PLAYER' || !balls[0].active) return;
+        
+        const rect = canvas.getBoundingClientRect();
+        let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        
+        let tx = (clientX - rect.left) / SCALE;
+        let ty = (clientY - rect.top) / SCALE;
+        
+        cue.angle = Math.atan2(ty - balls[0].y, tx - balls[0].x);
+    }
+
+    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleAim(e); }, {passive: false});
+    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); handleAim(e); }, {passive: false});
+    window.addEventListener('mousedown', (e) => { if(e.target === canvas) handleAim(e); });
+    window.addEventListener('mousemove', (e) => { if(e.buttons === 1 && e.target === canvas) handleAim(e); });
+
+    // Power Slider
+    const slider = document.getElementById('power-slider');
+    const knob = document.getElementById('cue-knob');
+    let draggingCue = false;
+    let startY = 0;
+
+    function startDrag(e) {
+        if (gameState !== 'AIMING' || turn !== 'PLAYER' || !balls[0].active) return;
+        e.preventDefault();
+        draggingCue = true;
+        startY = e.touches ? e.touches[0].clientY : e.clientY;
+        knob.style.transition = 'none';
+    }
+
+    slider.addEventListener('mousedown', startDrag);
+    slider.addEventListener('touchstart', startDrag, {passive: false});
+
+    function dragCue(e) {
+        if (!draggingCue) return;
+        let currentY = e.touches ? e.touches[0].clientY : e.clientY;
+        let delta = currentY - startY;
+        let pull = Math.max(0, Math.min(delta, 200));
+        cue.power = pull / 200;
+        knob.style.top = pull + 'px';
+    }
+
+    window.addEventListener('mousemove', dragCue);
+    window.addEventListener('touchmove', dragCue, {passive: false});
+
+    function endDrag() {
+        if (!draggingCue) return;
+        draggingCue = false;
+        
+        if (cue.power > 0.05) shoot();
+        
+        knob.style.transition = 'top 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+        knob.style.top = '0px';
+        setTimeout(() => {
+            knob.style.transition = '';
+            cue.power = 0;
+        }, 200);
+    }
+
+    window.addEventListener('mouseup', endDrag);
+    window.addEventListener('touchend', endDrag);
+
+    // 🎨 RENDERING
+    function getBallColor(id) {
+        if (id === 0) return '#eee';
+        if (id === 8) return '#111';
+        const c = ['#ffdb00','#0055ff','#ff0000','#7700ff','#ff7700','#006600','#880000'];
+        return c[(id - 1) % 7];
+    }
+    
+    function isStriped(id) { return id > 8; }
+
+    function drawTable() {
+        const m = RAIL_WIDTH;
+        
+        // Outer wood table
+        let woodGrad = ctx.createLinearGradient(0, 0, TABLE_W, TABLE_H);
+        woodGrad.addColorStop(0, '#4e342e');
+        woodGrad.addColorStop(0.5, '#795548');
+        woodGrad.addColorStop(1, '#3e2723');
+        
+        ctx.fillStyle = woodGrad;
+        ctx.beginPath();
+        ctx.roundRect(0, 0, TABLE_W, TABLE_H, 40);
+        ctx.fill();
+
+        // Inner felt
+        ctx.fillStyle = feltPattern;
+        ctx.beginPath();
+        ctx.roundRect(m, m, TABLE_W - m*2, TABLE_H - m*2, 10);
+        ctx.fill();
+
+        // Inner shadow
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur = 20;
+        ctx.strokeStyle = 'transparent'; // only want inner shadow effect essentially
+        ctx.strokeRect(m, m, TABLE_W - m*2, TABLE_H - m*2);
+        ctx.restore();
+
+        // Pockets
+        const pockets = getPocketLocs();
+        for (let p of pockets) {
+            ctx.fillStyle = '#000';
+            ctx.beginPath(); ctx.arc(p.x, p.y, POCKET_R, 0, Math.PI * 2); ctx.fill();
+            
+            ctx.strokeStyle = '#888';
+            ctx.lineWidth = 6;
+            ctx.beginPath(); ctx.arc(p.x, p.y, POCKET_R + 12, 0, Math.PI * 2); ctx.stroke();
+            
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(p.x, p.y, POCKET_R + 12, 0, Math.PI * 2); ctx.stroke();
+        }
+    }
+
+    function drawBalls() {
+        // Pass 1: Drop shadows
+        balls.forEach(b => {
+            if (!b.active) return;
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.beginPath(); ctx.arc(b.x + 4, b.y + 4, BALL_R, 0, Math.PI * 2); ctx.fill();
+        });
+
+        // Pass 2: Balls
+        balls.forEach(b => {
+            if (!b.active) return;
+            
+            if (isStriped(b.id)) {
+                ctx.fillStyle = '#fff';
+                ctx.beginPath(); ctx.arc(b.x, b.y, BALL_R, 0, Math.PI * 2); ctx.fill();
+                
+                ctx.fillStyle = getBallColor(b.id);
+                ctx.fillRect(b.x - BALL_R, b.y - 5, BALL_R * 2, 10);
+            } else {
+                ctx.fillStyle = getBallColor(b.id);
+                ctx.beginPath(); ctx.arc(b.x, b.y, BALL_R, 0, Math.PI * 2); ctx.fill();
+            }
+
+            // Radial highlight
+            let grad = ctx.createRadialGradient(b.x - 5, b.y - 5, 2, b.x, b.y, BALL_R);
+            grad.addColorStop(0, 'rgba(255,255,255,0.7)');
+            grad.addColorStop(0.5, 'rgba(255,255,255,0.1)');
+            grad.addColorStop(1, 'rgba(0,0,0,0.4)');
+            
+            ctx.fillStyle = grad;
+            ctx.beginPath(); ctx.arc(b.x, b.y, BALL_R, 0, Math.PI * 2); ctx.fill();
+
+            // Number label
+            if (b.id !== 0) {
+                ctx.fillStyle = '#fff';
+                ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, Math.PI * 2); ctx.fill();
+                
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 6px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(b.id, b.x, b.y);
+            }
+        });
+    }
+
+    function drawCue() {
+        const cb = balls[0];
+        
+        // Dashed guide line
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 6]);
+        ctx.beginPath();
+        ctx.moveTo(cb.x, cb.y);
+        ctx.lineTo(cb.x + Math.cos(cue.angle) * 600, cb.y + Math.sin(cue.angle) * 600);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Cue stick
+        ctx.save();
+        ctx.translate(cb.x, cb.y);
+        ctx.rotate(cue.angle + Math.PI);
+        let recoil = 20 + (cue.power * 80);
+        ctx.translate(recoil, 0);
+
+        let cueGrad = ctx.createLinearGradient(0, -6, 0, 6);
+        cueGrad.addColorStop(0, '#e0c090');
+        cueGrad.addColorStop(0.5, '#5d4037');
+        cueGrad.addColorStop(1, '#000');
+
+        ctx.fillStyle = cueGrad;
+        ctx.beginPath();
+        ctx.moveTo(0, -3);
+        ctx.lineTo(300, -6);
+        ctx.lineTo(300, 6);
+        ctx.lineTo(0, 3);
+        ctx.fill();
+
+        // Blue tip
+        ctx.fillStyle = '#007bff';
+        ctx.fillRect(-2, -3, 4, 6);
+        
+        ctx.restore();
+    }
+
+    function draw() {
+        ctx.fillStyle = '#111';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.save();
+        ctx.scale(SCALE, SCALE);
+        
+        drawTable();
+        drawBalls();
+        if (gameState === 'AIMING' && balls[0] && balls[0].active) {
+            drawCue();
+        }
+        
+        ctx.restore();
+        requestAnimationFrame(draw);
+    }
+
+    // 🔔 NOTIFICATION TOAST
+    function showNotification(txt, col) {
+        toast.innerText = txt;
+        toast.style.borderColor = col;
+        toast.style.color = col;
+        toast.style.opacity = 1;
+        toast.style.transform = 'translate(-50%, -50%) scale(1.1)';
+        
+        setTimeout(() => {
+            toast.style.opacity = 0;
+            toast.style.transform = 'translate(-50%, -50%) scale(0.5)';
+        }, 1500);
+    }
+
+    // 🏁 GAME START
+    function startGame() {
+        document.getElementById('menu-overlay').style.display = 'none';
+        initGame();
+        draw();
+        setInterval(updatePhysics, 16);
+    }
+</script>
+</body>
+</html>
